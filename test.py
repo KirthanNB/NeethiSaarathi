@@ -1,26 +1,22 @@
-# db_check.py
-from sqlalchemy import create_engine, inspect
+import requests
+import time
 
-def check_connection(db_url):
+url = "http://127.0.0.1:8000/query"
+params = {"q": "What is the procedure for constitutional amendments?"}
+
+try:
+    print("Attempting to connect to server...")
+    start_time = time.time()
+    response = requests.post(url, json=params)
+    end_time = time.time()
+
+    print(f"Response time: {end_time - start_time:.2f} seconds")
+    print("Status Code:", response.status_code)
+
     try:
-        engine = create_engine(db_url)
-        inspector = inspect(engine)
-        print(f"\nChecking: {db_url}")
-        print("Tables found:", inspector.get_table_names())
-        return True
-    except Exception as e:
-        print(f"Connection failed: {str(e)}")
-        return False
+        print("Response JSON:", response.json())
+    except ValueError:
+        print("Raw Response:", response.text)
 
-# Test possible database URLs
-db_urls = [
-    "sqlite:///test.db",          # Common SQLite path
-    "sqlite:///db/test.db",       # In a db subdirectory
-    "mysql+pymysql://user:pass@localhost/test",  # MySQL example
-    "postgresql://user:pass@localhost/test"      # PostgreSQL example
-]
-
-for url in db_urls:
-    if check_connection(url):
-        print(f"✅ Working connection at: {url}")
-        break
+except Exception as e:
+    print("Error:", str(e))
