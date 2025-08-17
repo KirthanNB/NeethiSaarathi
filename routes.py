@@ -25,3 +25,9 @@ def query(request: QueryRequest, db: Session = Depends(get_db)):
         "sources": [h["source"] for h in hits],
         "matches": [{"id": h["id"], "title": h["title"]} for h in hits],
     }
+
+from app.agent import run_agent
+
+@router.post("/agent")
+async def agent_endpoint(q: str):
+    return await run_agent(q)
