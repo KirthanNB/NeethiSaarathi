@@ -56,8 +56,9 @@ Millions of Indians miss out on **government benefits, schemes, and legal rights
 
 ### 1. Clone & Install
 ```bash
-git clone [https://github.com/KirthanNB/NeethiSaarathi.git]
+git clone https://github.com/KirthanNB/NeethiSaarathi.git
 cd NeethiSaarathi
 pip install -r requirements.txt
 npm install && npm run build-ui
+
 
