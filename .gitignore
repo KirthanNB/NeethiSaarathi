@@ -33,3 +33,42 @@ pip-wheel-metadata/
 
 # Logs and debug files
 *.log
+# Virtual environment
+venv/
+.venv/
+ENV/
+env/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python packaging and build files
+*.egg-info/
+*.egg
+dist/
+build/
+pip-wheel-metadata/
+
+# Development tools and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment variables & secrets
+.env
+.env.*
+*.pem
+
+# Database files
+*.db
+*.sqlite
+
+# Logs and debug files
+*.log
+
+# Node.js dependencies
+node_modules/
+
