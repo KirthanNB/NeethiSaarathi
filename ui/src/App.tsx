@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
 
 export default function App() {
   const [q, setQ] = useState('');
@@ -123,10 +124,7 @@ export default function App() {
           <div style={styles.logoRow}>
             <div style={styles.logoWrap}>
               <div style={styles.logoCircle}>
-                <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 40, height: 40 }}>
-                  <path fillRule="evenodd" d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5zm-1 9a1 1 0 112 0v2a1 1 0 11-2 0v-2z" clipRule="evenodd" />
-                </svg>
-                <span style={styles.ping} />
+                <img src="/assets/Neethi_Siarathi_logo.png" alt="Neethi Saarathi Logo" style={{ width: 170, height: 170, objectFit: 'contain',  }} />
               </div>
             </div>
 
@@ -241,31 +239,35 @@ export default function App() {
         </div>
 
         {/* ----------  RESPONSE CARD ---------- */}
+        {/* ----------  RESPONSE CARD ---------- */}
         {ans && (
-          <div style={styles.responseCard}>
-            <div style={styles.responseHeader}>
-              <div style={styles.responseIcon}>
-                <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 32, height: 32 }}>
-                  <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <h2 style={styles.responseTitle}>कानूनी सलाह</h2>
-                <p style={styles.responseSub}>Legal Advice</p>
-              </div>
-            </div>
+  <div style={styles.responseCard}>
+    <div style={styles.responseHeader}>
+      <div style={styles.responseIcon}>
+        <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 32, height: 32 }}>
+          <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
+        </svg>
+      </div>
+      <div>
+        <h2 style={styles.responseTitle}>कानूनी सलाह</h2>
+        <p style={styles.responseSub}>Legal Advice</p>
+      </div>
+    </div>
 
-            <div style={styles.responseBody}>
-              <pre style={styles.responseText}>{ans}</pre>
-            </div>
+    <div style={styles.responseBody}>
+      {/* ✅ Correct usage: pass string directly to ReactMarkdown */}
+      <ReactMarkdown>
+        {ans}
+      </ReactMarkdown>
+    </div>
 
-            <div style={styles.actionRow}>
-              <button style={styles.actionBtn}>📋 Copy Answer</button>
-              <button style={styles.actionBtn}>📄 Download PDF</button>
-              <button style={styles.actionBtn}>🔗 Share Link</button>
-            </div>
-          </div>
-        )}
+    <div style={styles.actionRow}>
+      <button style={styles.actionBtn}>📋 Copy Answer</button>
+      <button style={styles.actionBtn}>📄 Download PDF</button>
+      <button style={styles.actionBtn}>🔗 Share Link</button>
+    </div>
+  </div>
+)}
       </main>
 
       {/* ----------  FEATURES ---------- */}
@@ -322,9 +324,7 @@ export default function App() {
         <div style={styles.footerWave} />
         <div style={styles.footerContent}>
           <div style={styles.footerLogo}>
-            <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 48, height: 48, color: '#fff' }}>
-              <path fillRule="evenodd" d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5zm-1 9a1 1 0 112 0v2a1 1 0 11-2 0v-2z" clipRule="evenodd" />
-            </svg>
+            <img src="/assets/Neethi_Siarathi_logo.png" alt="Neethi Saarathi Logo" style={{ width: 170, height: 170, objectFit: 'contain' }} />
           </div>
           <h3 style={styles.footerBrand}>नीति<span style={{ color: '#fff' }}>सारथी</span></h3>
           <p style={styles.footerSub}>NeethiSaarathi</p>
@@ -440,11 +440,9 @@ const styles = {
     width: 80,
     height: 80,
     borderRadius: '50%',
-    background: 'linear-gradient(135deg,#fbbf24,#ea580c,#dc2626)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 20px 25px -5px rgba(0,0,0,.2)',
     color: '#fff'
   },
   ping: {
@@ -686,7 +684,7 @@ const styles = {
     color: '#fff',
     textAlign: 'center'
   },
-  footerLogo: { width: 96, height: 96, margin: '0 auto 32px', borderRadius: '50%', background: 'linear-gradient(135deg,#fbbf24,#ea580c)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  footerLogo: { width: 96, height: 96, margin: '0 auto 32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   footerBrand: { fontSize: 36, fontWeight: 900, margin: '0 0 4px' },
   footerSub: { fontSize: 24, color: '#fed7aa', margin: '0 0 48px' },
   footerGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 48, marginBottom: 48 },
