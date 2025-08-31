@@ -4,7 +4,7 @@ from sqlalchemy import Column, Integer, String, Text
 Base = declarative_base()
 
 class Chunk(Base):
-    __tablename__ = "chunks"
+    __tablename__ = "unified_chunks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(String(255), nullable=False)
