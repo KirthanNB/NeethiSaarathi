@@ -8,13 +8,25 @@ import json  # Added for JSON parsing
 
 logger = logging.getLogger(__name__)
 
-async def run_agent(question: str, db: Session):
+async def run_agent(question: str, db: Session, user_context: str = ""):
     try:
         logger.info(f"Processing question: {question}")
+        if user_context:
+            logger.info(f"User context provided: {user_context}")
         
         # 1. Retrieve relevant chunks from ACTUAL database
         chunks = retrieve(question, k=5, db=db)
         logger.info(f"Retrieved {len(chunks)} chunks from database")
+        
+        # Log the actual retrieved content for debugging
+        logger.info("Retrieved chunks content:")
+        for i, chunk in enumerate(chunks):
+            logger.info(f"Chunk {i+1}: Source={chunk.get('source', 'unknown')}, Title={chunk.get('title', 'No title')}")
+            logger.info(f"Content preview: {chunk['content'][:200]}...")
+            
+            # Log metadata if available
+            if 'metadata' in chunk:
+                logger.info(f"Metadata: {chunk['metadata']}")
         
         if not chunks:
             return {
@@ -32,8 +44,8 @@ async def run_agent(question: str, db: Session):
         category = classify_query_based_on_content(chunks)
         logger.info(f"Classified query as: {category}")
         
-        # 4. Generate answer using ACTUAL database content
-        answer_text = answer_scheme_question(question, context)
+        # 4. Generate answer using ACTUAL database content with user context
+        answer_text = answer_scheme_question(question, context, user_context)
         logger.info(f"Generated answer with {len(answer_text)} characters")
         
         # 5. Only generate form if it's a scheme AND needs form
@@ -136,13 +148,16 @@ def classify_query_based_on_content(chunks):
     else:
         return "GENERAL"
 
-def answer_scheme_question(question, context):
-    """Answer using ACTUAL scheme data from database"""
+def answer_scheme_question(question, context, user_context=""):
+    """Answer using ACTUAL scheme data from database with optional user context"""
+    user_context_part = f"\nUSER CONTEXT (personal information): {user_context}" if user_context else ""
+    
     scheme_prompt = f"""
     You are a government scheme assistant. Use ONLY the database context below.
     
     DATABASE CONTEXT (real scheme data):
     {context}
+    {user_context_part}
     
     QUESTION: {question}
     
@@ -152,6 +167,8 @@ def answer_scheme_question(question, context):
     - Benefits information available
     - Application process details
     - Required documents if mentioned
+    
+    If user context is provided, use it to personalize the answer (e.g., location, age, occupation).
     
     If the database doesn't contain specific information, say: "Based on the available database information, ..."
     """
