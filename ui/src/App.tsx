@@ -1,7 +1,8 @@
-"use client";
-
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
+import Questionnaire from './components/Questionnaire';
+import ProfileManager from './components/ProfileManager';
 
 export default function App() {
   const [q, setQ] = useState('');
@@ -10,12 +11,86 @@ export default function App() {
   const [mounted, setMounted] = useState(false);
   const [particles, setParticles] = useState([]);
   const [typing, setTyping] = useState('');
+  const [sessionId, setSessionId] = useState<string>('');
+  const [hasProfile, setHasProfile] = useState<boolean>(false);
+  const [profileLoading, setProfileLoading] = useState<boolean>(true);
+  const [isCopied, setIsCopied] = useState(false);
   const heroRef = useRef(null);
   const canvasRef = useRef(null);
+  const [showQuestionnaireModal, setShowQuestionnaireModal] = useState(false);
+  const [showProfileManager, setShowProfileManager] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
+  
+  /* ----------  User Profile Management ---------- */
+  const generateSessionId = () => {
+    const array = new Uint8Array(16);
+    window.crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  };
+
+  const getSessionId = () => {
+    let sessionId = localStorage.getItem('neethisaarathi_session_id');
+    if (!sessionId) {
+      sessionId = generateSessionId();
+      localStorage.setItem('neethisaarathi_session_id', sessionId);
+    }
+    return sessionId;
+  };
+
+  const checkProfileExists = async (sessionId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/user/profile/exists?session_id=${sessionId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.exists;
+      }
+    } catch (error) {
+      console.error('Error checking profile:', error);
+    }
+    return false;
+  };
+
+  const saveProfile = async (profileData: any) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, ...profileData })
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      return false;
+    }
+  };
 
   /* ----------  initialisation & canvas animation ---------- */
   useEffect(() => {
     setMounted(true);
+
+    // Initialize session and check profile
+    const initializeUser = async () => {
+      const id = getSessionId();
+      setSessionId(id);
+
+      try {
+        const response = await fetch(`http://localhost:8000/api/user/profile/exists?session_id=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          // ✅ Set hasProfile based on existence only, not completeness
+          setHasProfile(data.exists);
+        }
+      } catch (error) {
+        console.error('Error checking profile:', error);
+        // ✅ Even if there's an error, don't get stuck loading
+        setHasProfile(false);
+      } finally {
+        // ✅ Always set loading to false, no matter what
+        setProfileLoading(false);
+      }
+    };
+
+    initializeUser();
 
     const newParticles = Array.from({ length: 50 }, (_, i) => ({
       id: i,
@@ -73,7 +148,10 @@ export default function App() {
     if (!q.trim()) return;
     setLoading(true);
     try {
-      const { data } = await axios.post('/api/agent', { question: q });
+      const { data } = await axios.post('/api/agent', {
+        question: q,
+        session_id: sessionId // Send session ID for personalization
+      });
       setAns(data.answer);
     } catch (err) {
       setAns('❌  ' + (err.response?.data?.error || err.message));
@@ -82,302 +160,614 @@ export default function App() {
     }
   };
 
-  if (!mounted) return null;
+  const copyToClipboard = async () => {
+    if (!ans) return;
+    
+    try {
+      await navigator.clipboard.writeText(ans);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = ans;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
+
+  const handleProfileUpdate = async (updates: any) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, ...updates })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setProfile(result.profile);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+    return false;
+  };
+
+  const handleProfileComplete = () => {
+    setHasProfile(true);
+  };
+
+  if (!mounted || profileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-green-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-orange-500 border-t-green-500 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Loading your personalized experience...</p>
+        </div>
+      </div>
+    );
+  }
 
   /* ----------  JSX ---------- */
   return (
-    <div style={styles.pageWrapper}>
-      {/* animated canvas background */}
-      <canvas ref={canvasRef} style={styles.canvas} />
-
-      {/* gradient background */}
-      <div style={styles.gradientBg} />
-
-      {/* floating geometric shapes */}
-      <div style={styles.geometries}>
-        <svg viewBox="0 0 100 100" style={styles.hexagon} fill="url(#grad1)">
-          <polygon points="50,5 90,25 90,75 50,95 10,75 10,25" />
-          <defs>
-            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#f97316" />
-              <stop offset="100%" stopColor="#22c55e" />
-            </linearGradient>
-          </defs>
-        </svg>
-
-        <svg viewBox="0 0 100 100" style={styles.diamond} fill="url(#grad2)">
-          <path d="M50,10 L90,50 L50,90 L10,50 Z" />
-          <defs>
-            <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#22c55e" />
-              <stop offset="100%" stopColor="#f59e0b" />
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>
-
-      {/* ----------  HEADER ---------- */}
-      <header style={styles.header}>
-        <div style={styles.headerWave} />
-        <div style={styles.headerContent}>
-          <div style={styles.logoRow}>
-            <div style={styles.logoWrap}>
-              <div style={styles.logoCircle}>
-                <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 40, height: 40 }}>
-                  <path fillRule="evenodd" d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5zm-1 9a1 1 0 112 0v2a1 1 0 11-2 0v-2z" clipRule="evenodd" />
-                </svg>
-                <span style={styles.ping} />
-              </div>
-            </div>
-
-            <div style={styles.logoText}>
-              <h1 style={styles.brand}>
-                <span style={styles.brandPart1}>नीति</span>
-                <span style={styles.brandPart2}>सारथी</span>
-              </h1>
-              <div style={styles.dividerRow}>
-                <span style={styles.divider} />
-                <span style={styles.subBrand}>NEETHI SAARATHI</span>
-                <span style={styles.divider} />
-              </div>
-            </div>
-          </div>
-
-          <p style={styles.tagline}>
-            {typing}
-            <span style={styles.cursor} />
-          </p>
-        </div>
-        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" style={styles.bottomWave}>
-          <path d="M0,50 Q150,100 300,50 T600,50 T900,50 T1200,50 L1200,120 L0,120 Z" fill="#fff" />
-        </svg>
-      </header>
-
-      {/* ----------  HERO ---------- */}
-      <section ref={heroRef} style={styles.hero}>
-        <div style={styles.heroCard}>
-          <div style={styles.heroIcon}>
-            <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 48, height: 48 }}>
-              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-
-          <h2 style={styles.heroTitle}>
-            <span style={styles.heroTitle1}>आपका डिजिटल</span>
-            <br />
-            <span style={styles.heroTitle2}>न्यायिक सहायक</span>
-          </h2>
-          <h3 style={styles.heroSub}>Your Digital Legal Assistant</h3>
-
-          <p style={styles.heroDesc}>
-            <span style={{ color: '#f97316', fontWeight: 'bold' }}>भारतीय कानून</span>, <span style={{ color: '#22c55e', fontWeight: 'bold' }}>अधिकार</span>, या <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>सरकारी योजनाओं</span> के बारे में कोई भी प्रश्न पूछें
-          </p>
-          <p style={styles.heroDesc2}>
-            Ask any question about <span style={{ color: '#ea580c', fontWeight: 600 }}>Indian laws</span>, <span style={{ color: '#16a34a', fontWeight: 600 }}>rights</span>, or <span style={{ color: '#2563eb', fontWeight: 600 }}>government schemes</span>
-          </p>
-
-          <div style={styles.stats}>
-            <div style={styles.stat}><div style={styles.statNum}>10,000+</div><div style={styles.statLabel}>कानूनी प्रश्न | Legal Queries</div></div>
-            <div style={styles.stat}><div style={styles.statNum}>24/7</div><div style={styles.statLabel}>सहायता | Support</div></div>
-            <div style={styles.stat}><div style={styles.statNum}>100%</div><div style={styles.statLabel}>गोपनीयता | Privacy</div></div>
-          </div>
-        </div>
-      </section>
-
-      {/* ----------  QUERY CARD ---------- */}
-      <main style={styles.main}>
-        <div style={styles.queryCard}>
-          <div style={styles.queryHeader}>
-            <div style={styles.queryIcon}>
-              <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 32, height: 32 }}>
-                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-              </svg>
-            </div>
-            <div>
-              <h2 style={styles.queryTitle}>अपना प्रश्न पूछें</h2>
-              <p style={styles.querySub}>Ask Your Question</p>
-            </div>
-          </div>
-
-          <div style={styles.textareaWrap}>
-            <textarea
-              rows={8}
-              style={styles.textarea}
-              placeholder="उदाहरण: यदि मेरा मकान मालिक मेरी जमानत राशि रखता है तो मेरे अधिकार क्या हैं?&#10;&#10;Example: What are my rights if my landlord keeps my security deposit?&#10;&#10;💡 विस्तार से बताएं | Please provide details for better assistance"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-            />
-            <span style={styles.charCount}>{q.length}/1000</span>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <button
-              onClick={ask}
-              disabled={loading || !q.trim()}
-              style={{
-                ...styles.button,
-                background: loading
-                  ? 'linear-gradient(135deg,#9ca3af 0%,#6b7280 100%)'
-                  : 'linear-gradient(135deg,#f97316 0%,#ea580c 50%,#22c55e 100%)',
-                cursor: loading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {loading ? (
-                <>
-                  <div style={styles.spinner} />
-                  विचार कर रहे हैं... | Processing...
-                </>
-              ) : (
-                <>
-                  <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 24, height: 24 }}>
-                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                  </svg>
-                  <span style={{ marginLeft: 8 }}>प्रश्न भेजें | Submit Question</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* ----------  RESPONSE CARD ---------- */}
-        {ans && (
-          <div style={styles.responseCard}>
-            <div style={styles.responseHeader}>
-              <div style={styles.responseIcon}>
-                <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 32, height: 32 }}>
-                  <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <h2 style={styles.responseTitle}>कानूनी सलाह</h2>
-                <p style={styles.responseSub}>Legal Advice</p>
-              </div>
-            </div>
-
-            <div style={styles.responseBody}>
-              <pre style={styles.responseText}>{ans}</pre>
-            </div>
-
-            <div style={styles.actionRow}>
-              <button style={styles.actionBtn}>📋 Copy Answer</button>
-              <button style={styles.actionBtn}>📄 Download PDF</button>
-              <button style={styles.actionBtn}>🔗 Share Link</button>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* ----------  FEATURES ---------- */}
-      <section style={styles.features}>
-        <h2 style={styles.secTitle}>प्रमुख विशेषताएं</h2>
-        <p style={styles.secSub}>Premium Features</p>
-        <div style={styles.featureGrid}>
-          {[
-            { icon: '⚖️', title: 'व्यापक कानूनी डेटाबेस', titleEn: 'Comprehensive Legal Database', desc: '50,000+ भारतीय कानून, नियम और मिसाल', descEn: '50,000+ Indian laws, rules and precedents', grad: 'linear-gradient(135deg,#f97316 0%,#dc2626 100%)' },
-            { icon: '🔒', title: 'पूर्ण गोपनीयता सुरक्षा', titleEn: 'Complete Privacy Protection', desc: 'एंड-टू-एंड एन्क्रिप्शन और डेटा सुरक्षा', descEn: 'End-to-end encryption and data security', grad: 'linear-gradient(135deg,#3b82f6 0%,#4338ca 100%)' },
-            { icon: '⚡', title: 'तत्काल AI सहायता', titleEn: 'Instant AI Assistance', desc: '3 सेकंड में सटीक कानूनी जवाब', descEn: 'Accurate legal answers in 3 seconds', grad: 'linear-gradient(135deg,#22c55e 0%,#0d9488 100%)' },
-            { icon: '📱', title: 'मल्टी-प्लेटफॉर्म एक्सेस', titleEn: 'Multi-Platform Access', desc: 'वेब, मोबाइल, और व्हाट्सऐप पर उपलब्ध', descEn: 'Available on Web, Mobile, and WhatsApp', grad: 'linear-gradient(135deg,#a855f7 0%,#db2777 100%)' },
-            { icon: '🏛️', title: 'सुप्रीम कोर्ट डेटा', titleEn: 'Supreme Court Database', desc: 'नवीनतम निर्णय और संविधान संशोधन', descEn: 'Latest judgments and constitutional amendments', grad: 'linear-gradient(135deg,#eab308 0%,#ea580c 100%)' },
-            { icon: '🌐', title: '15+ भाषा समर्थन', titleEn: '15+ Language Support', desc: 'हिंदी, अंग्रेजी और क्षेत्रीय भाषाओं में', descEn: 'Hindi, English and regional languages', grad: 'linear-gradient(135deg,#6366f1 0%,#a855f7 100%)' }
-          ].map((f, i) => (
-            <div key={i} style={styles.featureCard}>
-              <div style={{ ...styles.featureIcon, background: f.grad }}>{f.icon}</div>
-              <h3 style={styles.featureTitle}>{f.title}</h3>
-              <h4 style={styles.featureTitleEn}>{f.titleEn}</h4>
-              <p style={styles.featureDesc}>{f.desc}</p>
-              <p style={styles.featureDescEn}>{f.descEn}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ----------  TESTIMONIALS ---------- */}
-      <section style={styles.testimonials}>
-        <h2 style={styles.secTitle}>उपयोगकर्ता प्रतिक्रिया</h2>
-        <p style={styles.secSub}>User Testimonials</p>
-        <div style={styles.testimonialGrid}>
-          {[
-            { name: 'राज कुमार शर्मा', nameEn: 'Raj Kumar Sharma', role: 'बिजनेसमैन | Businessman', text: 'NeethiSaarathi ने मेरे GST संबंधी सभी सवालों का तुरंत जवाब दिया। बहुत ही उपयोगी सेवा है।', textEn: 'NeethiSaarathi instantly answered all my GST-related questions. Very useful service.', avatar: '👨‍💼' },
-            { name: 'प्रिया पटेल', nameEn: 'Priya Patel', role: 'गृहिणी | Homemaker', text: 'घरेलू कानूनी समस्याओं के लिए यह बहुत अच्छा प्लेटफॉर्म है। सभी जानकारी हिंदी में मिलती है।', textEn: 'Great platform for household legal issues. All information available in Hindi.', avatar: '👩‍🦱' },
-            { name: 'अमित सिंह', nameEn: 'Amit Singh', role: 'वकील | Lawyer', text: 'मैं खुद एक वकील हूं, लेकिन यह टूल त्वरित रिसर्च के लिए बहुत उपयोगी है।', textEn: 'I\'m a lawyer myself, but this tool is very useful for quick research.', avatar: '👨‍⚖️' }
-          ].map((t, i) => (
-            <div key={i} style={styles.testimonialCard}>
-              <div style={styles.testimonialAvatar}>{t.avatar}</div>
-              <div>
-                <h4 style={styles.testimonialName}>{t.name}</h4>
-                <p style={styles.testimonialNameEn}>{t.nameEn}</p>
-                <p style={styles.testimonialRole}>{t.role}</p>
-              </div>
-              <div style={{ marginTop: 12 }}>⭐⭐⭐⭐⭐</div>
-              <blockquote style={styles.testimonialText}>"{t.text}"</blockquote>
-              <p style={styles.testimonialTextEn}>"{t.textEn}"</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ----------  FOOTER ---------- */}
-      <footer style={styles.footer}>
-        <div style={styles.footerWave} />
-        <div style={styles.footerContent}>
-          <div style={styles.footerLogo}>
-            <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 48, height: 48, color: '#fff' }}>
-              <path fillRule="evenodd" d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5zm-1 9a1 1 0 112 0v2a1 1 0 11-2 0v-2z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <h3 style={styles.footerBrand}>नीति<span style={{ color: '#fff' }}>सारथी</span></h3>
-          <p style={styles.footerSub}>NeethiSaarathi</p>
-
-          <div style={styles.footerGrid}>
-            <div>
-              <h4>🏛️ कानूनी सेवाएं</h4>
-              <p>Constitutional Law</p><p>Criminal Law</p><p>Civil Rights</p><p>Family Law</p>
-            </div>
-            <div>
-              <h4>📱 प्लेटफॉर्म</h4>
-              <p>Web Application</p><p>Mobile App</p><p>WhatsApp Bot</p><p>API Access</p>
-            </div>
-            <div>
-              <h4>🤝 सहायता</h4>
-              <p>24/7 Support</p><p>Legal Experts</p><p>Community Forum</p><p>Documentation</p>
-            </div>
-          </div>
-
-          <div style={styles.footerStats}>
-            <div><div style={styles.footerStatNum}>1M+</div><div>प्रश्न हल | Questions Solved</div></div>
-            <div><div style={styles.footerStatNum}>50K+</div><div>खुश उपयोगकर्ता | Happy Users</div></div>
-            <div><div style={styles.footerStatNum}>99.9%</div><div>सटीकता | Accuracy Rate</div></div>
-          </div>
-
-          <div style={styles.footerBottom}>
-            <p>© 2025 NeethiSaarathi | नीतिसारथी - All Rights Reserved</p>
-            <p style={{ fontWeight: 'bold', color: '#fbbf24' }}>सत्यमेव जयते | Truth Alone Triumphs</p>
-            <p>🇮🇳 Proudly Made in India 🇮🇳</p>
-          </div>
-        </div>
-        <div style={styles.footerBar} />
-      </footer>
-
-      {/* ----------  GLOBAL STYLES ---------- */}
+    <>
       <style>{`
-        body {
-          margin: 0;
-          font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-          background: #fef7ec;
-          overflow-x: hidden;
-          scroll-behavior: smooth;
-        }
-        * {
-          box-sizing: border-box;
-        }
-        pre {
-          font-family: inherit;
-        }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: linear-gradient(to bottom,#fee6d5,#d5fee6); }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(to bottom,#f59e0b,#10b981); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: linear-gradient(to bottom,#d97706,#059669); }
       `}</style>
-    </div>
+
+      <div style={styles.pageWrapper}>
+        {/* animated canvas background */}
+        <canvas ref={canvasRef} style={styles.canvas} />
+
+        {/* gradient background */}
+        <div style={styles.gradientBg} />
+
+        {/* floating geometric shapes */}
+        <div style={styles.geometries}>
+          <svg viewBox="0 0 100 100" style={styles.hexagon} fill="url(#grad1)">
+            <polygon points="50,5 90,25 90,75 50,95 10,75 10,25" />
+            <defs>
+              <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#f97316" />
+                <stop offset="100%" stopColor="#22c55e" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          <svg viewBox="0 0 100 100" style={styles.diamond} fill="url(#grad2)">
+            <path d="M50,10 L90,50 L50,90 L10,50 Z" />
+            <defs>
+              <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#22c55e" />
+                <stop offset="100%" stopColor="#f59e0b" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {/* ----------  MAIN APP CONTENT ---------- */}
+        <>
+          {/* ----------  HEADER ---------- */}
+          <header style={styles.header}>
+            <div style={styles.headerWave} />
+            <div style={styles.headerContent}>
+              <div style={styles.logoRow}>
+                <div style={styles.logoWrap}>
+                </div>
+
+                <div style={styles.logoText}>
+                  <h1 style={styles.brand}>
+                    <span style={styles.brandPart1}>नीति</span>
+                    <span style={styles.brandPart2}>सारथी</span>
+                  </h1>
+                  <div style={styles.dividerRow}>
+                    <span style={styles.divider} />
+                    <span style={styles.subBrand}>NEETHI SAARATHI</span>
+                    <span style={styles.divider} />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowQuestionnaireModal(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '25px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.3s ease-in-out'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.6)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.4)';
+                }}
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: '16px', height: '16px' }}>
+                  <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
+                </svg>
+                Enhance Experience
+              </button>
+
+              <p style={styles.tagline}>
+                {typing}
+                <span style={styles.cursor} />
+              </p>
+
+              {/* Profile Completion Prompt */}
+              {!hasProfile && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #f59e0b, #ea580c)',
+                  color: 'white',
+                  padding: '12px 24px',
+                  borderRadius: '25px',
+                  marginTop: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+                  transition: 'all 0.3s ease-in-out'
+                }}
+                onClick={() => setShowQuestionnaireModal(true)}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.6)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.4)';
+                }}
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: '16px', height: '16px' }}>
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                  </svg>
+                  Complete your profile for personalized assistance
+                </div>
+              )}
+
+              {/* ADD THIS IN YOUR HEADER SECTION */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '16px',
+                marginTop: '16px',
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  onClick={() => setShowProfileManager(true)}
+                  style={{
+                    background: 'linear-gradient(135deg, #f97316 0%, #22c55e 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: '25px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.3s ease-in-out',
+                    boxShadow: '0 4px 15px rgba(249, 115, 22, 0.4)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(249, 115, 22, 0.6)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(249, 115, 22, 0.4)';
+                  }}
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: '16px', height: '16px' }}>
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
+                  {hasProfile ? 'Manage Profile' : 'Create Profile'}
+                </button>
+
+                {/* Profile Status Indicator */}
+                <div style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(10px)',
+                  padding: '12px 20px',
+                  borderRadius: '25px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <div style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    background: hasProfile ? '#22c55e' : '#f59e0b',
+                    animation: hasProfile ? 'pulse 2s infinite' : 'none'
+                  }} />
+                  <span style={{ fontSize: '14px', fontWeight: '500' }}>
+                    {hasProfile ? 'Profile Complete ✓' : 'Profile Incomplete'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Profile Indicator */}
+              <div className="mt-4 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 inline-flex items-center">
+                <div className="w-3 h-3 bg-green-400 rounded-full mr-2 animate-pulse"></div>
+                <span className="text-sm font-medium">Profile Complete ✓</span>
+              </div>
+            </div>
+            <svg viewBox="0 0 1200 120" preserveAspectRatio="none" style={styles.bottomWave}>
+              <path d="M0,50 Q150,100 300,50 T600,50 T900,50 T1200,50 L1200,120 L0,120 Z" fill="#fff" />
+            </svg>
+          </header>
+
+          {/* ----------  HERO ---------- */}
+          <section ref={heroRef} style={styles.hero}>
+            <div style={styles.heroCard}>
+              <div style={styles.heroIcon}>
+                <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 48, height: 48 }}>
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+
+              <h2 style={styles.heroTitle}>
+                <span style={styles.heroTitle1}>आपका डिजिटल</span>
+                <br />
+                <span style={styles.heroTitle2}>न्यायिक सहायक</span>
+              </h2>
+              <h3 style={styles.heroSub}>Your Digital Legal Assistant</h3>
+
+              <p style={styles.heroDesc}>
+                <span style={{ color: '#f97316', fontWeight: 'bold' }}>भारतीय कानून</span>, <span style={{ color: '#22c55e', fontWeight: 'bold' }}>अधिकार</span>, या <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>सरकारी योजनाओं</span> के बारे में कोई भी प्रश्न पूछें
+              </p>
+              <p style={styles.heroDesc2}>
+                Ask any question about <span style={{ color: '#ea580c', fontWeight: 600 }}>Indian laws</span>, <span style={{ color: '#16a34a', fontWeight: 600 }}>rights</span>, or <span style={{ color: '#2563eb', fontWeight: 600 }}>government schemes</span>
+              </p>
+
+              <div style={styles.stats}>
+                <div style={styles.stat}><div style={styles.statNum}>10,000+</div><div style={styles.statLabel}>कानूनी प्रश्न | Legal Queries</div></div>
+                <div style={styles.stat}><div style={styles.statNum}>24/7</div><div style={styles.statLabel}>सहायता | Support</div></div>
+                <div style={styles.stat}><div style={styles.statNum}>100%</div><div style={styles.statLabel}>गोपनीयता | Privacy</div></div>
+              </div>
+            </div>
+          </section>
+
+          {/* ----------  QUERY CARD ---------- */}
+          <main style={styles.main}>
+            <div style={styles.queryCard}>
+              <div style={styles.queryHeader}>
+                <div style={styles.queryIcon}>
+                  <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 32, height: 32 }}>
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 style={styles.queryTitle}>अपना प्रश्न पूछें</h2>
+                  <p style={styles.querySub}>Ask Your Question</p>
+                </div>
+              </div>
+
+              <div style={styles.textareaWrap}>
+                <textarea
+                  rows={8}
+                  style={styles.textarea}
+                  placeholder="उदाहरण: यदि मेरा मकान मालिक मेरी जमानत राशि रखता है तो मेरे अधिकार क्या हैं?&#10;&#10;Example: What are my rights if my landlord keeps my security deposit?&#10;&#10;💡 विस्तार से बताएं | Please provide details for better assistance"
+                  value={q}
+                  onChange={e => setQ(e.target.value)}
+                />
+                <span style={styles.charCount}>{q.length}/1000</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <button
+                  onClick={ask}
+                  disabled={loading || !q.trim()}
+                  style={{
+                    ...styles.button,
+                    background: loading
+                      ? 'linear-gradient(135deg,#9ca3af 0%,#6b7280 100%)'
+                      : 'linear-gradient(135deg,#f97316 0%,#ea580c 50%,#22c55e 100%)',
+                    cursor: loading ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <div style={styles.spinner} />
+                      विचार कर रहे हैं... | Processing...
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 24, height: 24 }}>
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                      </svg>
+                      <span style={{ marginLeft: 8 }}>प्रश्न भेजें | Submit Question</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* ----------  RESPONSE CARD ---------- */}
+            {ans && (
+              <div style={styles.responseCard}>
+                <div style={styles.responseHeader}>
+                  <div style={styles.responseIcon}>
+                    <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 32, height: 32 }}>
+                      <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 style={styles.responseTitle}>कानूनी सलाह</h2>
+                    <p style={styles.responseSub}>Legal Advice</p>
+                  </div>
+                </div>
+
+                <div style={styles.responseBody}>
+                  <ReactMarkdown>
+                    {ans}
+                  </ReactMarkdown>
+                </div>
+
+                <div style={styles.actionRow}>
+                  <button 
+                    onClick={copyToClipboard}
+                    style={{
+                      ...styles.actionBtn,
+                      background: isCopied 
+                        ? 'linear-gradient(135deg,#22c55e 0%,#16a34a 100%)' 
+                        : 'linear-gradient(135deg,#3b82f6 0%,#2563eb 100%)'
+                    }}
+                    disabled={isCopied}
+                  >
+                    {isCopied ? '✅ Copied!' : '📋 Copy Answer'}
+                  </button>
+                  <button style={styles.actionBtn}>📄 Download PDF</button>
+                  <button style={styles.actionBtn}>🔗 Share Link</button>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* ----------  QUESTIONNAIRE MODAL ---------- */}
+          {showQuestionnaireModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px'
+            }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #fffbeb 0%, #ecfdf5 100%)',
+                borderRadius: '24px',
+                padding: '0',
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                position: 'relative'
+              }}>
+                <button
+                  onClick={() => setShowQuestionnaireModal(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    zIndex: 1001
+                  }}
+                >
+                  ×
+                </button>
+                <Questionnaire
+                  sessionId={sessionId}
+                  onComplete={() => {
+                    setHasProfile(true);
+                    setShowQuestionnaireModal(false);
+                  }}
+                  onSave={saveProfile}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ----------  PROFILE MANAGER MODAL ---------- */}
+          {showProfileManager && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px'
+            }}>
+              <div style={{
+                background: 'linear-gradient(135deg, #fffbeb 0%, #ecfdf5 100%)',
+                borderRadius: '24px',
+                padding: '0',
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                position: 'relative'
+              }}>
+                <button
+                  onClick={() => setShowProfileManager(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    background: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    zIndex: 1001
+                  }}
+                >
+                  ×
+                </button>
+                <ProfileManager
+                  sessionId={sessionId}
+                  onUpdate={handleProfileUpdate}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ----------  FEATURES ---------- */}
+          <section style={styles.features}>
+            <h2 style={styles.secTitle}>प्रमुख विशेषताएं</h2>
+            <p style={styles.secSub}>Premium Features</p>
+            <div style={styles.featureGrid}>
+              {[
+                { icon: '⚖️', title: 'व्यापक कानूनी डेटाबेस', titleEn: 'Comprehensive Legal Database', desc: '50,000+ भारतीय कानून, नियम और मिसाल', descEn: '50,000+ Indian laws, rules and precedents', grad: 'linear-gradient(135deg,#f97316 0%,#dc2626 100%)' },
+                { icon: '🔒', title: 'पूर्ण गोपनीयता सुरक्षा', titleEn: 'Complete Privacy Protection', desc: 'एंड-टू-एंड एन्क्रिप्शन और डेटा सुरक्षा', descEn: 'End-to-end encryption and data security', grad: 'linear-gradient(135deg,#3b82f6 0%,#4338ca 100%)' },
+                { icon: '⚡', title: 'तत्काल AI सहायता', titleEn: 'Instant AI Assistance', desc: '3 सेकंड में सटीक कानूनी जवाब', descEn: 'Accurate legal answers in 3 seconds', grad: 'linear-gradient(135deg,#22c55e 0%,#0d9488 100%)' },
+                { icon: '📱', title: 'मल्टी-प्लेटफॉर्म एक्सेस', titleEn: 'Multi-Platform Access', desc: 'वेब, मोबाइल, और व्हाट्सऐप पर उपलब्ध', descEn: 'Available on Web, Mobile, and WhatsApp', grad: 'linear-gradient(135deg,#a855f7 0%,#db2777 100%)' },
+                { icon: '🏛️', title: 'सुप्रीम कोर्ट डेटा', titleEn: 'Supreme Court Database', desc: 'नवीनतम निर्णय और संविधान संशोधन', descEn: 'Latest judgments and constitutional amendments', grad: 'linear-gradient(135deg,#eab308 0%,#ea580c 100%)' },
+                { icon: '🌐', title: '15+ भाषा समर्थन', titleEn: '15+ Language Support', desc: 'हिंदी, अंग्रेजी और क्षेत्रीय भाषाओं में', descEn: 'Hindi, English and regional languages', grad: 'linear-gradient(135deg,#6366f1 0%,#a855f7 100%)' }
+              ].map((f, i) => (
+                <div key={i} style={styles.featureCard}>
+                  <div style={{ ...styles.featureIcon, background: f.grad }}>{f.icon}</div>
+                  <h3 style={styles.featureTitle}>{f.title}</h3>
+                  <h4 style={styles.featureTitleEn}>{f.titleEn}</h4>
+                  <p style={styles.featureDesc}>{f.desc}</p>
+                  <p style={styles.featureDescEn}>{f.descEn}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ----------  TESTIMONIALS ---------- */}
+          <section style={styles.testimonials}>
+            <h2 style={styles.secTitle}>उपयोगकर्ता प्रतिक्रिया</h2>
+            <p style={styles.secSub}>User Testimonials</p>
+            <div style={styles.testimonialGrid}>
+              {[
+                { name: 'राज कुमार शर्मा', nameEn: 'Raj Kumar Sharma', role: 'बिजनेसमैन | Businessman', text: 'NeethiSaarathi ने मेरे GST संबंधी सभी सवालों का तुरंत जवाब दिया। बहुत ही उपयोगी सेवा है।', textEn: 'NeethiSaarathi instantly answered all my GST-related questions. Very useful service.', avatar: '👨‍💼' },
+                { name: 'प्रिया पटेल', nameEn: 'Priya Patel', role: 'गृहिणी | Homemaker', text: 'घरेलू कानूनी समस्याओं के लिए यह बहुत अच्छा प्लेटफॉर्म है। सभी जानकारी हिंदी में मिलती है।', textEn: 'Great platform for household legal issues. All information available in Hindi.', avatar: '👩‍🦱' },
+                { name: 'अमित सिंह', nameEn: 'Amit Singh', role: 'वकील | Lawyer', text: 'मैं खुद एक वकील हूं, लेकिन यह टूल त्वरित रिसर्च के लिए बहुत उपयोगी है।', textEn: 'I\'m a lawyer myself, but this tool is very useful for quick research.', avatar: '👨‍⚖️' }
+              ].map((t, i) => (
+                <div key={i} style={styles.testimonialCard}>
+                  <div style={styles.testimonialAvatar}>{t.avatar}</div>
+                  <div>
+                    <h4 style={styles.testimonialName}>{t.name}</h4>
+                    <p style={styles.testimonialNameEn}>{t.nameEn}</p>
+                    <p style={styles.testimonialRole}>{t.role}</p>
+                  </div>
+                  <div style={{ marginTop: 12 }}>⭐⭐⭐⭐⭐</div>
+                  <blockquote style={styles.testimonialText}>"{t.text}"</blockquote>
+                  <p style={styles.testimonialTextEn}>"{t.textEn}"</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+            {/* ----------  FOOTER ---------- */}
+            <footer style={styles.footer}>
+              <div style={styles.footerWave} />
+              <div style={styles.footerContent}>
+                <div style={styles.footerLogo}>
+                  <svg viewBox="0 0 20 20" fill="currentColor" style={{ width: 48, height: 48, color: '#fff' }}>
+                    <path fillRule="evenodd" d="M10 2L3 7v11h4v-6h6v6h4V7l-7-5zm-1 9a1 1 0 112 0v2a1 1 0 11-2 0v-2z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h3 style={styles.footerBrand}>नीति<span style={{ color: '#fff' }}>सारथी</span></h3>
+                <p style={styles.footerSub}>NeethiSaarathi</p>
+
+                <div style={styles.footerGrid}>
+                  <div>
+                    <h4>🏛️ कानूनी सेवाएं</h4>
+                    <p>Constitutional Law</p><p>Criminal Law</p><p>Civil Rights</p><p>Family Law</p>
+                  </div>
+                  <div>
+                    <h4>📱 प्लेटफॉर्म</h4>
+                    <p>Web Application</p><p>Mobile App</p><p>WhatsApp Bot</p><p>API Access</p>
+                  </div>
+                  <div>
+                    <h4>🤝 सहायता</h4>
+                    <p>24/7 Support</p><p>Legal Experts</p><p>Community Forum</p><p>Documentation</p>
+                  </div>
+                </div>
+
+                <div style={styles.footerStats}>
+                  <div><div style={styles.footerStatNum}>1M+</div><div>प्रश्न हल | Questions Solved</div></div>
+                  <div><div style={styles.footerStatNum}>50K+</div><div>खुश उपयोगकर्ता | Happy Users</div></div>
+                  <div><div style={styles.footerStatNum}>99.9%</div><div>सटीकता | Accuracy Rate</div></div>
+                </div>
+
+                <div style={styles.footerBottom}>
+                  <p>© 2025 NeethiSaarathi | नीतिसारथी - All Rights Reserved</p>
+                  <p style={{ fontWeight: 'bold', color: '#fbbf24' }}>सत्यमेव जयते | Truth Alone Triumphs</p>
+                  <p>🇮🇳 Proudly Made in India 🇮🇳</p>
+                </div>
+              </div>
+              <div style={styles.footerBar} />
+            </footer>
+          </>
+
+        {/* ----------  GLOBAL STYLES ---------- */}
+        <style>{`
+          body {
+            margin: 0;
+            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+            background: #fef7ec;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+          }
+          * {
+            box-sizing: border-box;
+          }
+          pre {
+            font-family: inherit;
+          }
+        `}</style>
+      </div>
+    </>
   );
 }
+
+// ... (keep all your existing style objects exactly as they are) ...
 
 /* ----------  CSS-IN-JS / OBJECT STYLES ---------- */
 const styles = {
@@ -698,6 +1088,10 @@ const styles = {
 
 /* ----------  KEYFRAMES ---------- */
 const css = `
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -708,10 +1102,6 @@ const css = `
 }
 @keyframes ping {
   75%,100% { transform: scale(2); opacity: 0; }
-}
-@keyframes pulse {
-  0%,100% { opacity: 1; }
-  50% { opacity: .5; }
 }
 @keyframes slideInFromBottom {
   from { opacity: 0; transform: translateY(100px); }
