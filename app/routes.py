@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
 from typing import Optional
-from fastapi.responses import JSONResponse  # ADD THIS IMPORT
+from fastapi.responses import JSONResponse
 from .agent import run_agent
 from .database import get_db
 from .search import retrieve as _retrieve
@@ -54,10 +54,20 @@ class ProfileRequest(BaseModel):
 def query(request: QueryRequest, db: Session = Depends(get_db)):
     try:
         q = request.q
-        hits = safe_retrieve(q, k=3, db=db)
+        
+        # Get user profile for search personalization
+        user_profile = None
+        if request.session_id:
+            profile = db.query(UserProfile).filter(UserProfile.session_id == request.session_id).first()
+            if profile:
+                user_profile = profile.to_dict()
+                logger.info(f"Using profile-enhanced search for session: {request.session_id}")
+        
+        # Use profile-enhanced search
+        hits = safe_retrieve(q, k=3, db=db, user_profile=user_profile)
         context = "\n\n---\n\n".join([h["content"] for h in hits]) if hits else ""
         
-        # ADD PERSONALIZATION CONTEXT
+        # ADD PERSONALIZATION CONTEXT for LLM
         if request.session_id:
             profile = db.query(UserProfile).filter(UserProfile.session_id == request.session_id).first()
             if profile:
@@ -105,7 +115,7 @@ def safe_retrieve(*args, **kwargs):
 @router.post("/agent")
 async def agent_endpoint(body: AgentRequest, db: Session = Depends(get_db)):
     try:
-        # ADD PERSONALIZATION TO AGENT TOO
+        # ADD PERSONALIZATION TO AGENT
         user_context = ""
         if body.session_id:
             profile = db.query(UserProfile).filter(UserProfile.session_id == body.session_id).first()
@@ -282,4 +292,52 @@ async def delete_user_profile(
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Database error deleting profile: {e}")
+        raise HTTPException(status_code=500, detail="Database connection error")
+
+@router.get("/user/profile/completion")
+async def get_profile_completion(
+    session_id: str = Query(..., description="User session ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    Check profile completion status and return missing fields
+    """
+    try:
+        profile = db.query(UserProfile).filter(UserProfile.session_id == session_id).first()
+        
+        if not profile:
+            return {
+                "success": True,
+                "exists": False,
+                "completion_percentage": 0,
+                "missing_fields": ["all"],
+                "next_required_fields": ["state", "gender", "social_category", "annual_income", "has_disability", "occupation"]
+            }
+        
+        # Define required fields for basic completion
+        basic_fields = ["state", "gender", "social_category", "annual_income", "has_disability", "occupation"]
+        
+        # Check which basic fields are filled
+        filled_basic = 0
+        missing_basic = []
+        
+        for field in basic_fields:
+            value = getattr(profile, field)
+            if value is not None and value != "":
+                filled_basic += 1
+            else:
+                missing_basic.append(field)
+        
+        completion_percentage = int((filled_basic / len(basic_fields)) * 100)
+        
+        return {
+            "success": True,
+            "exists": True,
+            "completion_percentage": completion_percentage,
+            "missing_fields": missing_basic,
+            "next_required_fields": missing_basic[:3] if missing_basic else []
+        }
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Database error checking profile completion: {e}")
         raise HTTPException(status_code=500, detail="Database connection error")
