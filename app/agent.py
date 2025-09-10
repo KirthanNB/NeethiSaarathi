@@ -4,34 +4,9 @@ from .actions import generate_scheme_form
 from sqlalchemy.orm import Session
 import re
 import logging
-import json
-from .models import UserProfile
+import json  # Added for JSON parsing
 
 logger = logging.getLogger(__name__)
-
-def extract_session_id(user_context: str) -> str:
-    """Extract session ID from user context string with multiple patterns"""
-    if not user_context:
-        return ""
-    
-    # Try multiple patterns to extract session ID
-    patterns = [
-        r'session[_\-\s]?id[:\s]*([^\s,;]+)',
-        r'session[:\s]*([^\s,;]+)',
-        r'id[:\s]*([^\s,;]+)',
-        r'profile[:\s]*([^\s,;]+)'
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, user_context.lower())
-        if match:
-            session_id = match.group(1).strip()
-            # Clean up any trailing punctuation
-            session_id = re.sub(r'[.,;!?]$', '', session_id)
-            if session_id and len(session_id) > 5:  # Basic validation
-                return session_id
-    
-    return ""
 
 async def run_agent(question: str, db: Session, user_context: str = ""):
     try:
@@ -39,43 +14,19 @@ async def run_agent(question: str, db: Session, user_context: str = ""):
         if user_context:
             logger.info(f"User context provided: {user_context}")
         
-        # Extract user profile for search personalization
-        user_profile = None
-        session_id = extract_session_id(user_context)
-        
-        if session_id:
-            logger.info(f"Extracted session ID: {session_id}")
-            profile = db.query(UserProfile).filter(UserProfile.session_id == session_id).first()
-            if profile:
-                user_profile = profile.to_dict()
-                logger.info(f"Found user profile for session: {session_id}")
-                logger.info(f"Profile details: State={user_profile.get('state')}, Occupation={user_profile.get('occupation')}")
-            else:
-                logger.warning(f"No profile found for session ID: {session_id}")
-        
-        # 1. Retrieve relevant chunks with profile-enhanced search
-        chunks = retrieve(question, k=5, db=db, user_profile=user_profile)
+        # 1. Retrieve relevant chunks from ACTUAL database
+        chunks = retrieve(question, k=5, db=db)
         logger.info(f"Retrieved {len(chunks)} chunks from database")
         
         # Log the actual retrieved content for debugging
         logger.info("Retrieved chunks content:")
         for i, chunk in enumerate(chunks):
-            source = chunk.get('source', 'unknown')
-            title = chunk.get('title', 'No title')
-            content_preview = chunk['content'][:200] + "..." if len(chunk['content']) > 200 else chunk['content']
-            
-            logger.info(f"Chunk {i+1}: Source={source}, Title={title}")
-            logger.info(f"Content preview: {content_preview}")
+            logger.info(f"Chunk {i+1}: Source={chunk.get('source', 'unknown')}, Title={chunk.get('title', 'No title')}")
+            logger.info(f"Content preview: {chunk['content'][:200]}...")
             
             # Log metadata if available
             if 'metadata' in chunk:
-                metadata = chunk['metadata']
-                if isinstance(metadata, str):
-                    try:
-                        metadata = json.loads(metadata)
-                    except:
-                        pass
-                logger.info(f"Metadata: {metadata}")
+                logger.info(f"Metadata: {chunk['metadata']}")
         
         if not chunks:
             return {
