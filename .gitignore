@@ -20,6 +20,7 @@ pip-wheel-metadata/
 htmlcov/
 coverage.xml
 nosetests.xml
+.pem
 
 # Editors/OS
 .idea/
