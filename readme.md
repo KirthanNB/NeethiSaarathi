@@ -4,62 +4,76 @@
 
 ---
 
-## 🏆 Dual Hackathon Challenger
+🌟 Inspiration
 
-| Hackathon | Badge |
-|-----------|-------|
-| **TiDB AgentX 2025** | ![TiDB](https://img.shields.io/badge/TiDB-AgentX-00a6ff) |
-| **OpenAI Open Model 2025** | ![OpenAI](https://img.shields.io/badge/OpenAI-gpt--oss-19c37d) |
+Millions of Indian citizens are unaware of their rights, welfare benefits, and government schemes because the information is hidden in PDFs, overloaded portals, and legal jargon. This gap often leaves vulnerable groups dependent on middlemen, lawyers, or misinformation.
 
----
+We were inspired to build NeethiSaarathi as an AI-powered legal buddy that brings clarity and accessibility to every citizen — empowering people to know and claim their rights instantly.
 
-## 💡 Why NeethiSaarathi?
+⚖️ What it does
 
-Millions of Indians miss out on **government benefits, schemes, and legal rights** simply because the information is buried in:  
-- 📄 Complex PDFs  
-- 🌐 Overloaded portals  
-- ⚖️ Jargon-heavy legal acts  
+Answers legal and welfare queries in plain, everyday language.
 
-👉 **NeethiSaarathi bridges that gap** by becoming your **AI-powered legal buddy**, answering questions in **plain language, instantly.**
+Explains government schemes, acts, and policies instantly.
 
-✅ No lawyers.  
-✅ No fees.  
-✅ No delays.  
-✨ Just **clarity**.
+Works offline after initial sync — no constant internet required.
 
----
+Provides trustworthy, source-linked answers without jargon, lawyers, or fees.
 
-## ⚙️ How it Works
+👉 A citizen can simply ask: “Am I eligible for widow pension?” and NeethiSaarathi will provide a clear explanation along with source references.
 
-- 🕸️ **Scraping Engine** – Collects laws & schemes from official portals  
-- 📑 **Smart Chunking + Embeddings** – Powered by `all-MiniLM-L6-v2`  
-- 🗄️ **TiDB Vector Store** – Combines MySQL 8 + native vector search  
-- 🧠 **Offline LLM (gpt-oss-20b)** – Runs locally via Ollama (no internet needed after sync)  
-- 🎨 **Frontend (React + Vite)** – Minimal, accessible UI served directly by FastAPI  
+🛠️ How we built it
 
----
+Data Collection: Scraped laws, government portals, and official PDFs.
 
-## 🔥 Tech Stack at a Glance
+Preprocessing: Chunked and embedded documents using all-MiniLM-L6-v2.
 
-| Layer      | Stack |
-|------------|-------------------------------|
-| **Backend** | FastAPI (Python) |
-| **Database** | TiDB Serverless (MySQL 8 + vector search) |
-| **LLM** | gpt-oss-20b (via Ollama) |
-| **Embeddings** | all-MiniLM-L6-v2 |
-| **Frontend** | React (Vite) + Tailwind |
-| **CI/CD** | GitHub Actions + Vercel Preview |
+AI Core: Used OpenAI models for summarization, Q&A, and plain-language translation of legal text.
 
----
+Backend: FastAPI for serving queries.
 
-## 🚀 Quick Start
+Frontend: React (Vite) + Tailwind for a minimal, mobile-friendly citizen interface.
 
-### 1. Clone & Install
-```bash
-git clone https://github.com/KirthanNB/NeethiSaarathi.git
-cd NeethiSaarathi
-pip install -r requirements.txt
-npm install && npm run build-ui
+Deployment: GitHub Actions + Vercel for previews and rapid iteration.
 
+🚧 Challenges we ran into
 
+Parsing unstructured PDFs with inconsistent formatting.
 
+Handling legal jargon while keeping explanations accurate but simple.
+
+Optimizing responses to work in low-connectivity or offline settings.
+
+Balancing accuracy vs. accessibility — ensuring that simplification doesn’t distort the meaning of legal texts.
+
+🏆 Accomplishments that we're proud of
+
+Built an end-to-end AI system that makes legal rights accessible to anyone.
+
+Designed a lightweight, citizen-first interface that works across devices.
+
+Integrated OpenAI models to bridge the gap between complex laws and human-friendly answers.
+
+Demonstrated the potential to reach millions of underserved citizens with legal awareness.
+
+📚 What we learned
+
+How to combine AI + embeddings + retrieval to simplify real-world complex data.
+
+The importance of user-centered design in legal tech — accessibility matters as much as accuracy.
+
+How to balance performance with fairness, ensuring the system doesn’t misrepresent rights.
+
+That AI can be a powerful tool for social justice, not just productivity.
+
+🔮 What's next for NeethiSaarathi
+
+Adding multilingual voice support for Indian regional languages.
+
+Deploying as a WhatsApp bot to reach rural communities.
+
+Creating a personalized eligibility checker for schemes.
+
+Partnering with NGOs and government agencies to scale adoption.
+
+⚖️ NeethiSaarathi is more than a hackathon project — it’s a mission to ensure that every citizen can understand and claim their rights with the power of AI.
