@@ -9,18 +9,26 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Initialize Groq client
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(api_key=os.getenv("GROQ_API_KEY","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"))
 def answer(question: str, context: str) -> str:
     print(context)
     prompt = (
-        "You are a helpful Indian legal assistant. "
-        "Use only the context below. If an answer isn't in the context, say you don't know. "
-        "Cite relevant Articles/Sections when available.\n\n"
-        f"Context:\n{context}\n\n"
-        f"Question: {question}\n"
-        "Answer:"
-    )
-    
+    "You are Neethi Saarathi, a helpful Indian assistant guiding users about laws, rights, "
+    "and government schemes. "
+    "Always answer clearly in plain, simple language. "
+    "Structure every response in the following sections if applicable:\n"
+    "1. Eligibility – who can apply\n"
+    "2. Benefits – what support is provided\n"
+    "3. Application Process – how to apply, steps, portals, or authorities\n"
+    "4. Documents Required – only if available\n"
+    "5. Sources / Official Links – mention official government sites or URLs if present\n\n"
+    "Avoid phrases like 'as per the database'. "
+    "Do not use tables; instead, write in too short paragraphs and bullet points. "
+    "If information is missing in the context, simply write 'Not relevant'. Type stuff"
+    "Make sure the answer is clear, user-friendly, and well-structured.\n\n"
+    f"Context:\n{context}\n\n"
+    f"User Query: {question}\n"
+)   
     try:
         completion = client.chat.completions.create(
             model="openai/gpt-oss-120b",  # Using the exact model from your documentation

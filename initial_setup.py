@@ -9,7 +9,7 @@ load_dotenv()
 ca_path = os.path.join(os.path.dirname(__file__), 'cacert.pem')
 
 engine = create_engine(
-    os.getenv("TIDB_URL"),
+    os.getenv("TIDB_URL","mysql+pymysql://2UKryQY2xjKAPbg.root:6SqoslthiJYnEbIx@gateway01.us-west-2.prod.aws.tidbcloud.com:4000/test"),
     connect_args={
         "ssl": {
             "ca": ca_path,
