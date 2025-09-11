@@ -1,35 +1,58 @@
-# Virtual environment
+# Python venvs
 venv/
 .venv/
 ENV/
 env/
 
-# Python cache and compiled files
+# Python caches/build
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Python packaging and build files
 *.egg-info/
 *.egg
 dist/
 build/
 pip-wheel-metadata/
+.mypy_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+nosetests.xml
 
-# Development tools and IDEs
+# Editors/OS
 .idea/
 .vscode/
 *.swp
 *.swo
+.DS_Store
+Thumbs.db
 
-# Environment variables
+# Env files
 .env
 .env.local
 .env*.local
+!.env.example
 
-# Database files
+# Databases
 *.db
 *.sqlite
 
-# Logs and debug files
+# Logs
 *.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Node/Vite (frontend)
+node_modules/
+ui/node_modules/
+ui/dist/
+ui/.vite/
+ui/.eslintcache
+ui/.parcel-cache/
+ui/.turbo/
+ui/coverage/

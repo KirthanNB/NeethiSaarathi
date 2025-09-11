@@ -9,11 +9,11 @@ import urllib.parse
 load_dotenv()
 
 # ---- TiDB Cloud Configuration ----
-TIDB_HOST = os.getenv("TIDB_HOST")
-TIDB_PORT = os.getenv("TIDB_PORT")
-TIDB_USER = os.getenv("TIDB_USER")
-TIDB_PASSWORD = os.getenv("TIDB_PASSWORD")
-TIDB_DATABASE = os.getenv("TIDB_DATABASE")
+TIDB_HOST = os.getenv("TIDB_HOST","gateway01.ap-southeast-1.prod.aws.tidbcloud.com")
+TIDB_PORT = os.getenv("TIDB_PORT","4000")
+TIDB_USER = os.getenv("TIDB_USER","34Pmbpy1H3sw7oU.root")
+TIDB_PASSWORD = os.getenv("TIDB_PASSWORD","r1KYLhwbVr5E3u1C")
+TIDB_DATABASE = os.getenv("TIDB_DATABASE","test")
 
 # URL-encode password
 encoded_password = urllib.parse.quote_plus(TIDB_PASSWORD)

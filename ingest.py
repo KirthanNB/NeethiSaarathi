@@ -11,14 +11,14 @@ from app.models import Base, Chunk
 # Configuration
 load_dotenv()
 PDF_PATH = "data/sample/constitution.pdf"
-BATCH_SIZE = 20
+BATCH_SIZE = 50
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 def initialize_components():
     """Initialize database and ML model"""
     # Setup database engine with SSL
     engine = create_engine(
-        os.getenv("TIDB_URL"),
+        os.getenv("TIDB_URL","mysql+pymysql://2UKryQY2xjKAPbg.root:6SqoslthiJYnEbIx@gateway01.us-west-2.prod.aws.tidbcloud.com:4000/test"),
         connect_args={
             "ssl": {
                 "ca": os.path.join(os.path.dirname(__file__), "cacert.pem"),
