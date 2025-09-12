@@ -1,19 +1,16 @@
 fastapi==0.116.1
 uvicorn==0.35.0
-
 sqlalchemy==2.0.43
 pymysql==1.1.1
 tidb-vector==0.0.15
-
 python-dotenv==1.1.1
 requests==2.32.4
 orjson==3.11.2
 regex==2025.7.34
-
 numpy==2.2.6
 pandas==2.3.2
-
-torch==2.8.0
-transformers==4.55.2
-sentence-transformers==5.1.0
 groq==0.31.0
+
+# ---- NEW tiny CPU stack ----
+onnxruntime>=1.17          # ONNX engine (CPU only)
+transformers==4.55.2       # tokenizer only (no model download)
