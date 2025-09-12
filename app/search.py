@@ -1,4 +1,4 @@
-# app/search.py  (drop-in, ONNX-based, < 350 MB RAM)
+# app/search.py  (ONNX-based, < 350 MB RAM, batch-size safe)
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -17,10 +17,9 @@ logger = logging.getLogger(__name__)
 MODEL_DIR = Path(__file__).parent.parent / "minilm_onnx"
 MODEL_PATH = MODEL_DIR / "model.onnx"
 
-# ONNX runtime session (CPU only)
 _sess = ort.InferenceSession(str(MODEL_PATH), providers=["CPUExecutionProvider"])
 _vocab_inp = _sess.get_inputs()[0].name
-_tok = AutoTokenizer.from_pretrained(str(MODEL_DIR))   # tokenizer files inside same folder
+_tok = AutoTokenizer.from_pretrained(str(MODEL_DIR))
 
 def _embed(texts: list[str]) -> np.ndarray:
     """Return 384-dim vectors (batch, 384) float32"""
@@ -34,7 +33,7 @@ def _embed(texts: list[str]) -> np.ndarray:
     pooled = (outputs * mask[:, :, np.newaxis]).sum(axis=1) / mask.sum(axis=1, keepdims=True)
     return pooled.astype(np.float32)
 
-# ---------- 2.  your existing helpers (unchanged) ----------
+# ---------- 2.  your existing helpers ----------
 def _profile_to_search_terms(profile: Optional[Dict]) -> str:
     if not profile:
         return ""
@@ -90,7 +89,7 @@ def _cosine_sim_matrix(q: np.ndarray, mat: np.ndarray, mat_norms: np.ndarray) ->
     dots = mat @ q
     return dots / (mat_norms * q_norm)
 
-# ---------- 3.  cache (unchanged logic) ----------
+# ---------- 3.  cache + mini-batch embedding ----------
 _cache_lock = threading.Lock()
 _cached_docs: List[Dict[str, Any]] = []
 _cached_mat: Optional[np.ndarray] = None
@@ -111,18 +110,6 @@ def _build_cache(db: Session) -> None:
         if not docs:
             _cached_docs, _cached_mat, _cached_norms, _cache_ready = [], np.empty((0, 384), dtype=np.float32), np.empty(0, dtype=np.float32), True
             return
-
-        # ---- embed in mini-batches (≤ 64) ----
-        batch_size = 64
-        all_embs = []
-        texts = [d["content"] for d in docs]
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            all_embs.append(_embed(batch))
-        embs = np.vstack(all_embs)
-        norms = np.linalg.norm(embs, axis=1)
-
-        _cached_docs, _cached_mat, _cached_norms, _cache_ready = docs, embs, norms, True
 
         # ---- embed in mini-batches (≤ 64) ----
         batch_size = 64
