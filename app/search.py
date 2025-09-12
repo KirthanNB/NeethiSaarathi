@@ -111,13 +111,15 @@ def _build_cache(db: Session) -> None:
             _cached_docs, _cached_mat, _cached_norms, _cache_ready = [], np.empty((0, 384), dtype=np.float32), np.empty(0, dtype=np.float32), True
             return
 
-        # ---- embed in mini-batches (≤ 64) ----
-        batch_size = 64
+        # ---- embed in tiny batches (≤ 16) + gc ----
+        import gc
+        batch_size = 16
         all_embs = []
         texts = [d["content"] for d in docs]
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
             all_embs.append(_embed(batch))
+            gc.collect()          # free ONNX intermediate tensors
         embs = np.vstack(all_embs)
         norms = np.linalg.norm(embs, axis=1)
 
@@ -182,3 +184,4 @@ def retrieve(query: str,
     for i, res in enumerate(final_results[:3]):
         logger.info(f"  {i+1}. Score: {scored_results[i]['final_score']:.3f} - {res['content'][:100]}...")
     return final_results
+
