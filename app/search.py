@@ -1,4 +1,4 @@
-# app/search.py  (drop-in replacement)
+# app/search.py  (drop-in, ONNX-based, < 350 MB RAM)
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -7,27 +7,23 @@ from numpy.linalg import norm
 import json
 import logging
 import threading
-import onnxruntime as ort
 from pathlib import Path
+import onnxruntime as ort
 from transformers import AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
-# ---------- 1.  ONNX model + tokenizer ----------
-MODEL_URL = "https://huggingface.co/optimum/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"
-MODEL_PATH = Path(__file__).with_name("minilm.onnx")
+# ---------- 1.  local ONNX model ----------
+MODEL_DIR = Path(__file__).parent / "minilm_onnx"
+MODEL_PATH = MODEL_DIR / "model.onnx"
 
-if not MODEL_PATH.exists():
-    logger.info("Downloading ONNX model once …")
-    import httpx
-    MODEL_PATH.write_bytes(httpx.get(MODEL_URL, follow_redirects=True).content)
-
+# ONNX runtime session (CPU only)
 _sess = ort.InferenceSession(str(MODEL_PATH), providers=["CPUExecutionProvider"])
 _vocab_inp = _sess.get_inputs()[0].name
-_tok = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
+_tok = AutoTokenizer.from_pretrained(str(MODEL_DIR))   # tokenizer files inside same folder
 
 def _embed(texts: list[str]) -> np.ndarray:
-    """CPU-only embedding → (batch, 384) float32"""
+    """Return 384-dim vectors (batch, 384) float32"""
     encoded = _tok(texts, padding=True, truncation=True, max_length=128, return_tensors="np")
     outputs = _sess.run(None, {
         _vocab_inp: encoded["input_ids"],
@@ -43,7 +39,6 @@ def _profile_to_search_terms(profile: Optional[Dict]) -> str:
     if not profile:
         return ""
     terms = []
-    # (keep your original implementation here)
     if profile.get('state'):
         terms.append(profile['state'])
     if profile.get('occupation'):
