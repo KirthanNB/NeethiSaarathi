@@ -123,7 +123,19 @@ def _build_cache(db: Session) -> None:
         norms = np.linalg.norm(embs, axis=1)
 
         _cached_docs, _cached_mat, _cached_norms, _cache_ready = docs, embs, norms, True
-        
+
+        # ---- embed in mini-batches (≤ 64) ----
+        batch_size = 64
+        all_embs = []
+        texts = [d["content"] for d in docs]
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            all_embs.append(_embed(batch))
+        embs = np.vstack(all_embs)
+        norms = np.linalg.norm(embs, axis=1)
+
+        _cached_docs, _cached_mat, _cached_norms, _cache_ready = docs, embs, norms, True
+
 def _ensure_cache(db: Session) -> None:
     if not _cache_ready:
         _build_cache(db)
