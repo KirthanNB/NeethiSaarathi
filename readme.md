@@ -78,7 +78,8 @@ Partnering with NGOs and government agencies to scale adoption.
 
 ⚖️ NeethiSaarathi is more than a hackathon project — it’s a mission to ensure that every citizen can understand and claim their rights with the power of AI.
 
-##How to use
+
+## How to use
 
 ```
 git clone https://github.com/KirthanNB/NeethiSaarathi.git 
@@ -89,3 +90,4 @@ npm run dev
 ```
 
 Don't forget to star this repo if you found something new!!
+
